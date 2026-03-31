@@ -1,0 +1,82 @@
+name: Render Evidence Dashboard
+
+on:
+  repository_dispatch:
+    types: [render-dashboard]
+
+# Payload fields expected in client_payload:
+#   job_id          - UUID of the Bedrock analysis run
+#   namespace       - Bedrock namespace (e.g. "bedrock")
+#   analysis_name   - Human-readable job name (for logging only)
+#   github_repo     - org/repo of the job definition (e.g. "Elite-Analytics-Inc/bedrock-analysis-ny-taxi")
+#   r2_prefix       - R2 key prefix for this run (e.g. "analytics/bedrock/<job_id>")
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout evidence template
+        uses: actions/checkout@v4
+
+      - name: Clone analysis evidence/ directory
+        run: |
+          gh repo clone "${{ github.event.client_payload.github_repo }}" /tmp/analysis-repo -- --depth 1
+          # Overlay the analyst's pages and sources (evidence/ dir) into this project
+          if [ -d /tmp/analysis-repo/evidence/pages ]; then
+            cp -r /tmp/analysis-repo/evidence/pages/. ./pages/
+          fi
+          if [ -d /tmp/analysis-repo/evidence/sources ]; then
+            cp -r /tmp/analysis-repo/evidence/sources/. ./sources/
+          fi
+          echo "Evidence files copied"
+          ls -la pages/ sources/results/ 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Download Parquet results from R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+          AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_DEFAULT_REGION: auto
+        run: |
+          PREFIX="${{ github.event.client_payload.r2_prefix }}"
+          echo "Downloading from s3://${{ secrets.R2_BUCKET }}/${PREFIX}/data/"
+          aws s3 cp "s3://${{ secrets.R2_BUCKET }}/${PREFIX}/data/" ./sources/results/ \
+            --recursive --include "*.parquet" || {
+            echo "WARNING: no Parquet files found at ${PREFIX}/data/ — dashboard may be empty"
+          }
+          echo "Parquet files in sources/results/:"
+          ls -lh sources/results/*.parquet 2>/dev/null || echo "  (none)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Evidence dependencies
+        run: npm ci
+
+      - name: Build Evidence dashboard
+        run: npm run build
+        env:
+          # Suppress Evidence telemetry
+          EVIDENCE_DISABLE_TELEMETRY: true
+
+      - name: Upload dashboard to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+          AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_DEFAULT_REGION: auto
+        run: |
+          PREFIX="${{ github.event.client_payload.r2_prefix }}"
+          echo "Uploading to s3://${{ secrets.R2_BUCKET }}/${PREFIX}/dashboard/"
+          aws s3 sync ./build/ \
+            "s3://${{ secrets.R2_BUCKET }}/${PREFIX}/dashboard/" \
+            --delete \
+            --content-type-from-file
+          echo "Dashboard uploaded"
