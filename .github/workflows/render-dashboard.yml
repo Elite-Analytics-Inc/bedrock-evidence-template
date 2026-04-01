@@ -7,7 +7,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout evidence template
@@ -47,23 +47,19 @@ jobs:
 
       - name: Install Evidence dependencies
         run: |
-          # --ignore-scripts skips @evidence-dev/sdk's postinstall TypeScript build
-          # (the dist/ JS is already included in the published package).
-          npm install --ignore-scripts --legacy-peer-deps
-          # evidence build needs the .evidence/template SvelteKit project to exist.
-          # Run the Evidence CLI init to create it (won't start a dev server).
-          npx evidence --help > /dev/null 2>&1 || true
-          # Re-run just the Evidence postinstall to scaffold .evidence/template/
-          node node_modules/@evidence-dev/evidence/src/cli/index.js build --help > /dev/null 2>&1 || true
-          if [ ! -d .evidence/template ]; then
-            echo "Manually initializing Evidence template..."
-            node -e "
-              const {execSync} = require('child_process');
-              try { execSync('npx evidence dev --exit', {stdio:'pipe', timeout:10000}); } catch(e) {}
-            " 2>/dev/null || true
+          # --legacy-peer-deps: allows typescript@5.9.x to resolve (Evidence 36
+          # has a strict peer dep on 5.4.2 but 5.9.x is compatible at runtime).
+          npm install --legacy-peer-deps
+          # Evidence's postinstall creates .evidence/template/ (a SvelteKit project).
+          # Install that project's deps with --ignore-scripts to get @sveltejs/kit
+          # without re-running the SDK TypeScript build (already compiled in dist/).
+          if [ -d .evidence/template ] && [ -f .evidence/template/package.json ]; then
+            echo "Installing .evidence/template deps (--ignore-scripts to skip SDK rebuild)..."
+            npm install --prefix .evidence/template --legacy-peer-deps --ignore-scripts
+            echo "Template node_modules/@sveltejs/kit present:" $(ls .evidence/template/node_modules/@sveltejs/kit 2>/dev/null && echo yes || echo NO)
+          else
+            echo "WARNING: .evidence/template not created by postinstall"
           fi
-          echo "Contents of .evidence:"
-          ls -la .evidence/ 2>/dev/null || echo "  (.evidence not created)"
 
       - name: Build Evidence dashboard
         run: npm run build
