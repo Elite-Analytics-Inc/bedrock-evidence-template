@@ -46,7 +46,7 @@ jobs:
           node-version: "20"
 
       - name: Install Evidence dependencies
-        run: npm install --legacy-peer-deps --ignore-scripts
+        run: npm install --ignore-scripts
 
       - name: Build Evidence dashboard
         run: npm run build
@@ -65,3 +65,9 @@ jobs:
             "s3://${{ secrets.R2_BUCKET }}/${PREFIX}/dashboard/" \
             --delete
           echo "Dashboard uploaded"
+
+      - name: Notify Rails
+        run: |
+          curl -s -X POST "${{ secrets.RAILS_CALLBACK_URL }}/webhooks/analysis/${{ github.event.client_payload.job_id }}/dashboard_ready" \
+            -H "X-Bedrock-Token: ${{ secrets.BEDROCK_WEBHOOK_SECRET }}" \
+            --max-time 10 || echo "Webhook notification failed (non-fatal)"
