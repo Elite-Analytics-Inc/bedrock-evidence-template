@@ -55,10 +55,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
 
       - name: Install Evidence dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Evidence dashboard
         run: npm run build
@@ -77,6 +76,5 @@ jobs:
           echo "Uploading to s3://${{ secrets.R2_BUCKET }}/${PREFIX}/dashboard/"
           aws s3 sync ./build/ \
             "s3://${{ secrets.R2_BUCKET }}/${PREFIX}/dashboard/" \
-            --delete \
-            --content-type-from-file
+            --delete
           echo "Dashboard uploaded"
