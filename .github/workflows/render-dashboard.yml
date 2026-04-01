@@ -47,13 +47,23 @@ jobs:
 
       - name: Install Evidence dependencies
         run: |
-          npm install
-          # Evidence's postinstall creates .evidence/template/ (a nested SvelteKit project).
-          # Install its deps too so vite can find @sveltejs/kit at build time.
-          if [ -d .evidence/template ] && [ -f .evidence/template/package.json ]; then
-            echo "Installing .evidence/template deps..."
-            npm install --prefix .evidence/template --legacy-peer-deps
+          # --ignore-scripts skips @evidence-dev/sdk's postinstall TypeScript build
+          # (the dist/ JS is already included in the published package).
+          npm install --ignore-scripts --legacy-peer-deps
+          # evidence build needs the .evidence/template SvelteKit project to exist.
+          # Run the Evidence CLI init to create it (won't start a dev server).
+          npx evidence --help > /dev/null 2>&1 || true
+          # Re-run just the Evidence postinstall to scaffold .evidence/template/
+          node node_modules/@evidence-dev/evidence/src/cli/index.js build --help > /dev/null 2>&1 || true
+          if [ ! -d .evidence/template ]; then
+            echo "Manually initializing Evidence template..."
+            node -e "
+              const {execSync} = require('child_process');
+              try { execSync('npx evidence dev --exit', {stdio:'pipe', timeout:10000}); } catch(e) {}
+            " 2>/dev/null || true
           fi
+          echo "Contents of .evidence:"
+          ls -la .evidence/ 2>/dev/null || echo "  (.evidence not created)"
 
       - name: Build Evidence dashboard
         run: npm run build
