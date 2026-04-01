@@ -46,7 +46,7 @@ jobs:
           node-version: "20"
 
       - name: Install Evidence dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps --ignore-scripts
 
       - name: Build Evidence dashboard
         run: npm run build
