@@ -4,13 +4,6 @@ on:
   repository_dispatch:
     types: [render-dashboard]
 
-# Payload fields expected in client_payload:
-#   job_id          - UUID of the Bedrock analysis run
-#   namespace       - Bedrock namespace (e.g. "bedrock")
-#   analysis_name   - Human-readable job name (for logging only)
-#   github_repo     - org/repo of the job definition (e.g. "Elite-Analytics-Inc/bedrock-analysis-ny-taxi")
-#   r2_prefix       - R2 key prefix for this run (e.g. "analytics/bedrock/<job_id>")
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,7 +16,6 @@ jobs:
       - name: Clone analysis evidence/ directory
         run: |
           gh repo clone "${{ github.event.client_payload.github_repo }}" /tmp/analysis-repo -- --depth 1
-          # Overlay the analyst's pages and sources (evidence/ dir) into this project
           if [ -d /tmp/analysis-repo/evidence/pages ]; then
             cp -r /tmp/analysis-repo/evidence/pages/. ./pages/
           fi
@@ -43,12 +35,9 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           PREFIX="${{ github.event.client_payload.r2_prefix }}"
-          echo "Downloading from s3://${{ secrets.R2_BUCKET }}/${PREFIX}/data/"
           aws s3 cp "s3://${{ secrets.R2_BUCKET }}/${PREFIX}/data/" ./sources/results/ \
-            --recursive --include "*.parquet" || {
-            echo "WARNING: no Parquet files found at ${PREFIX}/data/ — dashboard may be empty"
-          }
-          echo "Parquet files in sources/results/:"
+            --recursive --include "*.parquet" || \
+            echo "WARNING: no Parquet files found"
           ls -lh sources/results/*.parquet 2>/dev/null || echo "  (none)"
 
       - name: Set up Node.js
@@ -59,17 +48,16 @@ jobs:
       - name: Install Evidence dependencies
         run: |
           npm install
-          # Evidence creates .evidence/template/ with its own SvelteKit deps during postinstall.
-          # Install those too if the directory exists.
+          # Evidence's postinstall creates .evidence/template/ (a nested SvelteKit project).
+          # Install its deps too so vite can find @sveltejs/kit at build time.
           if [ -d .evidence/template ] && [ -f .evidence/template/package.json ]; then
             echo "Installing .evidence/template deps..."
-            npm install --prefix .evidence/template
+            npm install --prefix .evidence/template --legacy-peer-deps
           fi
 
       - name: Build Evidence dashboard
         run: npm run build
         env:
-          # Suppress Evidence telemetry
           EVIDENCE_DISABLE_TELEMETRY: true
 
       - name: Upload dashboard to R2
@@ -80,7 +68,6 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           PREFIX="${{ github.event.client_payload.r2_prefix }}"
-          echo "Uploading to s3://${{ secrets.R2_BUCKET }}/${PREFIX}/dashboard/"
           aws s3 sync ./build/ \
             "s3://${{ secrets.R2_BUCKET }}/${PREFIX}/dashboard/" \
             --delete
