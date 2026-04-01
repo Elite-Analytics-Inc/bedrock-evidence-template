@@ -11,7 +11,6 @@
     "@evidence-dev/duckdb": "^1.0.0"
   },
   "devDependencies": {
-    "svelte": "^4.0.0",
-    "typescript": "5.4.2"
+    "svelte": "^4.0.0"
   }
 }
