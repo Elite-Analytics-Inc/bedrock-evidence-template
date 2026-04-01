@@ -57,7 +57,14 @@ jobs:
           node-version: "20"
 
       - name: Install Evidence dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          npm install
+          # Evidence creates .evidence/template/ with its own SvelteKit deps during postinstall.
+          # Install those too if the directory exists.
+          if [ -d .evidence/template ] && [ -f .evidence/template/package.json ]; then
+            echo "Installing .evidence/template deps..."
+            npm install --prefix .evidence/template
+          fi
 
       - name: Build Evidence dashboard
         run: npm run build
