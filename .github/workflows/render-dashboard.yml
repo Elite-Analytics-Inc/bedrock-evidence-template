@@ -40,6 +40,39 @@ jobs:
             echo "WARNING: no Parquet files found"
           ls -lh sources/results/*.parquet 2>/dev/null || echo "  (none)"
 
+      - name: Build DuckDB database from Parquet files
+        run: |
+          pip install duckdb --quiet
+          python3 << 'PYEOF'
+          import duckdb, glob, os, re
+
+          parquets = sorted(glob.glob('sources/results/*.parquet'))
+          if not parquets:
+              print("No Parquet files — skipping DuckDB creation")
+              exit(0)
+
+          conn = duckdb.connect('sources/results/results.duckdb')
+          for f in parquets:
+              name = os.path.splitext(os.path.basename(f))[0]
+              conn.execute(f"CREATE TABLE IF NOT EXISTS \"{name}\" AS SELECT * FROM read_parquet('{f}')")
+              n = conn.execute(f'SELECT count(*) FROM "{name}"').fetchone()[0]
+              print(f"  {name}: {n} rows")
+              # Rewrite companion SQL to query the table directly (no read_parquet)
+              sql_path = f'sources/results/{name}.sql'
+              if os.path.exists(sql_path):
+                  sql = open(sql_path).read()
+                  sql = re.sub(r"read_parquet\('[^']+'\)", f'"{name}"', sql)
+                  open(sql_path, 'w').write(sql)
+                  print(f"  rewrote {sql_path}")
+          conn.close()
+
+          # Point connection.yaml at the persistent db file
+          path = 'sources/results/results.connection.yaml'
+          content = open(path).read().replace('":memory:"', '"results.duckdb"')
+          open(path, 'w').write(content)
+          print("Updated results.connection.yaml → results.duckdb")
+          PYEOF
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
