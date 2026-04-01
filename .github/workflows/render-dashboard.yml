@@ -91,7 +91,6 @@ jobs:
         run: npm run build
         env:
           EVIDENCE_DISABLE_TELEMETRY: true
-          VITE_EVIDENCE_SPA: "true"
 
       - name: Upload dashboard to R2
         env:
