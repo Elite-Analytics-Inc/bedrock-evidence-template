@@ -46,20 +46,7 @@ jobs:
           node-version: "20"
 
       - name: Install Evidence dependencies
-        run: |
-          # --legacy-peer-deps: allows typescript@5.9.x to resolve (Evidence 36
-          # has a strict peer dep on 5.4.2 but 5.9.x is compatible at runtime).
-          npm install --legacy-peer-deps
-          # Evidence's postinstall creates .evidence/template/ (a SvelteKit project).
-          # Install that project's deps with --ignore-scripts to get @sveltejs/kit
-          # without re-running the SDK TypeScript build (already compiled in dist/).
-          if [ -d .evidence/template ] && [ -f .evidence/template/package.json ]; then
-            echo "Installing .evidence/template deps (--ignore-scripts to skip SDK rebuild)..."
-            npm install --prefix .evidence/template --legacy-peer-deps --ignore-scripts
-            echo "Template node_modules/@sveltejs/kit present:" $(ls .evidence/template/node_modules/@sveltejs/kit 2>/dev/null && echo yes || echo NO)
-          else
-            echo "WARNING: .evidence/template not created by postinstall"
-          fi
+        run: npm install --legacy-peer-deps
 
       - name: Build Evidence dashboard
         run: npm run build
