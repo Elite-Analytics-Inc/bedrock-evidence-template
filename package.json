@@ -25,6 +25,7 @@
     "@evidence-dev/component-utilities": "3.1.0",
     "@evidence-dev/tailwind": "2.1.0",
     "@evidence-dev/query-store": "2.1.4",
-    "@evidence-dev/db-orchestrator": "3.1.1"
+    "@evidence-dev/db-orchestrator": "3.1.1",
+    "git-remote-origin-url": "^4.0.0"
   }
 }
