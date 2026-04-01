@@ -73,6 +73,12 @@ jobs:
           print("Updated results.connection.yaml → results.duckdb")
           PYEOF
 
+      - name: Copy Parquet files to static dir for DuckDB-WASM
+        run: |
+          mkdir -p static/data/results
+          cp sources/results/*.parquet static/data/results/ 2>/dev/null || true
+          ls -lh static/data/results/ 2>/dev/null || echo "  (no parquets to copy)"
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
