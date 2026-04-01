@@ -67,7 +67,7 @@ jobs:
           conn.close()
 
           # Point connection.yaml at the persistent db file
-          path = 'sources/results/results.connection.yaml'
+          path = 'sources/results/connection.yaml'
           content = open(path).read().replace('":memory:"', '"results.duckdb"')
           open(path, 'w').write(content)
           print("Updated results.connection.yaml → results.duckdb")
@@ -85,7 +85,7 @@ jobs:
           node-version: "20"
 
       - name: Install Evidence dependencies
-        run: npm install --ignore-scripts
+        run: npm install
 
       - name: Generate Evidence sources
         run: npx evidence sources
