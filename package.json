@@ -1,6 +1,7 @@
 {
   "name": "bedrock-evidence-template",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "dev": "evidence dev",
     "build": "evidence build",
