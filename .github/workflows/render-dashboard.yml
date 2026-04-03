@@ -74,6 +74,7 @@ jobs:
           PYEOF
 
       - name: Copy Parquet files to static dir for DuckDB-WASM
+        if: ${{ github.event.client_payload.ssg != true }}
         run: |
           mkdir -p static/data/results
           cp sources/results/*.parquet static/data/results/ 2>/dev/null || true
