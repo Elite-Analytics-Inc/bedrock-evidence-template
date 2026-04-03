@@ -84,18 +84,26 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Configure Evidence (plugins + base path)
+        run: |
+          cat > evidence.config.yaml <<EOFCFG
+          plugins:
+            components:
+              "@evidence-dev/core-components": {}
+            datasources:
+              "@evidence-dev/duckdb": {}
+          deployment:
+            basePath: /analysis_runs/${{ github.event.client_payload.job_id }}/dashboard
+          EOFCFG
+          sed -i 's/^          //' evidence.config.yaml
+          echo "evidence.config.yaml:"
+          cat evidence.config.yaml
+
       - name: Install Evidence dependencies
         run: npm install
 
       - name: Generate Evidence sources
         run: npx evidence sources
-
-      - name: Configure Evidence base path
-        run: |
-          printf 'deployment:\n  basePath: /analysis_runs/%s/dashboard\n' \
-            "${{ github.event.client_payload.job_id }}" > evidence.config.yaml
-          echo "evidence.config.yaml:"
-          cat evidence.config.yaml
 
       - name: Build Evidence dashboard
         run: npm run build
