@@ -85,9 +85,7 @@ jobs:
           node-version: "20"
 
       - name: Install Evidence dependencies
-        run: |
-          npm install --ignore-scripts
-          npm rebuild duckdb
+        run: npm install
 
       - name: Generate Evidence sources
         run: npx evidence sources
