@@ -94,10 +94,9 @@ jobs:
 
       - name: Configure Evidence base path
         run: |
-          cat > evidence.config.yaml << YAML
-          deployment:
-            basePath: /analysis_runs/${{ github.event.client_payload.job_id }}/dashboard
-          YAML
+          printf 'deployment:\n  basePath: /analysis_runs/%s/dashboard\n' \
+            "${{ github.event.client_payload.job_id }}" > evidence.config.yaml
+          echo "evidence.config.yaml:"
           cat evidence.config.yaml
 
       - name: Build Evidence dashboard
