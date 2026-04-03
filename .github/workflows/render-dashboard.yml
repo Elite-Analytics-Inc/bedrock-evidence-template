@@ -27,17 +27,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Download Parquet results from R2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-          AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-          AWS_DEFAULT_REGION: auto
+      - name: Download Parquet results via presigned URLs
         run: |
-          PREFIX="${{ github.event.client_payload.r2_prefix }}"
-          aws s3 cp "s3://${{ secrets.R2_BUCKET }}/${PREFIX}/data/" ./sources/results/ \
-            --recursive --include "*.parquet" || \
-            echo "WARNING: no Parquet files found"
+          mkdir -p sources/results
+          URLS='${{ toJSON(github.event.client_payload.parquet_urls) }}'
+          echo "$URLS" | jq -c '.[]' | while read -r item; do
+            NAME=$(echo "$item" | jq -r '.name')
+            URL=$(echo "$item" | jq -r '.url')
+            echo "Downloading $NAME..."
+            curl -sSf -o "sources/results/$NAME" "$URL"
+          done
           ls -lh sources/results/*.parquet 2>/dev/null || echo "  (none)"
 
       - name: Build DuckDB database from Parquet files
@@ -57,7 +56,6 @@ jobs:
               conn.execute(f"CREATE TABLE IF NOT EXISTS \"{name}\" AS SELECT * FROM read_parquet('{f}')")
               n = conn.execute(f'SELECT count(*) FROM "{name}"').fetchone()[0]
               print(f"  {name}: {n} rows")
-              # Rewrite companion SQL to query the table directly (no read_parquet)
               sql_path = f'sources/results/{name}.sql'
               if os.path.exists(sql_path):
                   sql = open(sql_path).read()
@@ -66,7 +64,6 @@ jobs:
                   print(f"  rewrote {sql_path}")
           conn.close()
 
-          # Point connection.yaml at the persistent db file
           path = 'sources/results/connection.yaml'
           content = open(path).read().replace('":memory:"', '"results.duckdb"')
           open(path, 'w').write(content)
@@ -111,18 +108,19 @@ jobs:
         env:
           EVIDENCE_DISABLE_TELEMETRY: true
 
-      - name: Upload dashboard to R2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
-          AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-          AWS_DEFAULT_REGION: auto
+      - name: Upload dashboard tarball via presigned URL
         run: |
-          PREFIX="${{ github.event.client_payload.r2_prefix }}"
-          aws s3 sync ./build/ \
-            "s3://${{ secrets.R2_BUCKET }}/${PREFIX}/dashboard/" \
-            --delete
-          echo "Dashboard uploaded"
+          UPLOAD_URL='${{ github.event.client_payload.upload_url }}'
+          if [ -z "$UPLOAD_URL" ] || [ "$UPLOAD_URL" = "null" ]; then
+            echo "ERROR: No upload URL provided"
+            exit 1
+          fi
+          echo "Creating tarball..."
+          tar -czf /tmp/dashboard.tar.gz -C ./build .
+          SIZE=$(du -h /tmp/dashboard.tar.gz | cut -f1)
+          echo "Uploading dashboard.tar.gz ($SIZE)..."
+          curl -sSf -X PUT -T /tmp/dashboard.tar.gz "$UPLOAD_URL"
+          echo "Dashboard tarball uploaded"
 
       - name: Notify Rails
         run: |
