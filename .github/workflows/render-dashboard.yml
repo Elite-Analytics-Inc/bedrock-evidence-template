@@ -92,6 +92,14 @@ jobs:
       - name: Generate Evidence sources
         run: npx evidence sources
 
+      - name: Configure Evidence base path
+        run: |
+          cat > evidence.config.yaml << YAML
+          deployment:
+            basePath: /analysis_runs/${{ github.event.client_payload.job_id }}/dashboard
+          YAML
+          cat evidence.config.yaml
+
       - name: Build Evidence dashboard
         run: npm run build
         env:
