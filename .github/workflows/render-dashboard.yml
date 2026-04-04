@@ -39,6 +39,12 @@ jobs:
           done
           ls -lh sources/results/*.parquet 2>/dev/null || echo "  (none)"
 
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-duckdb-${{ runner.os }}
+
       - name: Build DuckDB database from Parquet files
         run: |
           pip install duckdb --quiet
@@ -96,6 +102,12 @@ jobs:
           sed -i 's/^          //' evidence.config.yaml
           echo "evidence.config.yaml:"
           cat evidence.config.yaml
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: evidence-deps-${{ hashFiles('package-lock.json') }}
 
       - name: Install Evidence dependencies
         run: npm install
